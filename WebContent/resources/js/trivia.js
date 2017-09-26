@@ -19,8 +19,9 @@ var game = new function () {
     var validity = -3;
     var instance = this;
     var score = 0;
-    var answers = {};
+    var answers = [ ];
     var answersMaxScore = {};
+    var answerCount;
     var questionIndex = 0;
     var timerOn = false;
     var timerPrev = null;
@@ -52,7 +53,7 @@ var game = new function () {
     		url: URL_RESTSERVICE + '/case/'+ 1,
     		dataType: "json", // data type of response
     		success: function(data){
-    			questions_temp = data;
+    			mcase = data;
     		},
 			error : function() { }
     	});
@@ -131,6 +132,7 @@ var game = new function () {
         }
         gameScore = answeredScore;
         instance.onUpdateScore(gameScore);
+        console.log(answeredScore_quiz/maxScore);
         instance.updateQuizPercent(answeredScore_quiz/maxScore);
         instance.updateProgressText();
     }
@@ -198,7 +200,7 @@ var game = new function () {
     /* -----------------------  STEP-3 Questions ------------------------- */
 
     function nextQuestion() {
-        if (!empty(questions_temp.states)) {
+    	if (mcase.states[questionIndex] != undefined ) {
             gameTime_question=0;
             startTimer();
             $('#game').removeClass('step-3');
@@ -253,26 +255,28 @@ var game = new function () {
     /* -----------------------  STEP-4 Answers ------------------------- */
 
     function questionShow(i) {
-    	console.log(i);
-    	console.log(questions_temp.states[i])
         $('#game').addClass('step-4');
-        var question = questions_temp.states[i];
+
+        var question = mcase.states[i];
         var score = nvl(question.right_score,1);
         var wscore = nvl(question.wrong_score,1); /* Question wscore is optional, default 1 per question */
+        var srscore = nvl(question.semi_right_score,1)
+
         current_time= (new Date().getTime());
 //        if (statistic.questions_answers['q' + i] != 0) 
 //        	statistic.questions_time['q' + i] = 0;//reset question time on start/correct/fail (don't reset on incorrect)
-        console.log(question.description);
-        $('#game').data('question', question).data('score', score).data('wscore', wscore);;
 
+        $('#game').data('question', question).data('score', score).data('wscore', wscore).data('srscore', srscore);
         $('.step-4').removeClass("type-multiple");
-console.log(question.title);
+
         conditionalShow($('.question-block h1'),question.title);
+        
         $('.question-block div').html(value(question.description));
         $('.question-choose').html("");
-        var correct = value(question.correct_answer).split(',');
-
-        console.log(correct);
+        
+//        var correct = value(question.correct_answer).split(',');
+//        var not_wrong = value(question.not_wrong).split(',');
+        
         var i = 0;
         var order = [];
 
@@ -280,16 +284,19 @@ console.log(question.title);
         var eliAnimButtonDivOpen = (design.eli_anim_button_enabled) ? "<div class='eli-button'>" : "";
         var eliAnimButtonDivClose = (design.eli_anim_button_enabled) ? "</div>" : "";
         var eliAnimClickAlertDiv = (design.eli_anim_clickalert_enabled) ? "<div class='eli-clickalert'></div>" : "";
-        console.log(question);
+
         while (!empty(value(question.answers[i]))) {
-            var variant = $("<div class='variant-wrapper'><div class='variant'>" + eliAnimButtonDivOpen + "<div class='table'><div>" + value(question.answers[i].text) + "</div></div>" + eliAnimClickAlertDiv + eliAnimButtonDivClose + "</div></div>");
+            var variant = $("<div class='variant-wrapper'>" +
+            					"<div class='variant'>" + eliAnimButtonDivOpen + 
+            		        		"<div class='table'>" +
+            		        			"<div>" + value(question.answers[i].text) + 
+            		        			"</div>" +
+            		        		"</div>" + eliAnimClickAlertDiv + eliAnimButtonDivClose + 
+            		        	"</div>" +
+            		        "</div>");
             
-            variant.data({'correct': false, 'number': i});
-            for (var k in correct) {
-                if (i == correct[k].trim()) {
-                    variant.data('correct', true);
-                }
-            }
+            variant.data({'correctness': question.answers[i].correctness, 'number': i});
+            
             order[order.length] = variant;
             i++;
         }
@@ -328,45 +335,54 @@ console.log(question.title);
         instance.onQuestionHide(i);
     }
 
+    var answerChanged = function () {
+    	if (!$('div.step-4').hasClass('type-multiple')) {
+    		answerConfirmed();
+    	}
+    };
+    
     liveFastClick('div.question-choose .variant', function () {
         $(this).toggleClass('choosed');
         answerChanged();
     });
-    var answerChanged = function () {
-        if (!$('div.step-4').hasClass('type-multiple')) {
-            answerConfirmed();
-        }
-    };
 
     liveFastClick('a.button-question-confirm', function () {
         answerConfirmed();
     });
 
     var answerConfirmed = function () {
-        if(currentQuestionSound) {
+    	if(currentQuestionSound) {
             tRewind(currentQuestionSound);
         }
         var question = $('#game').data('question');
         var lscore = $('#game').data('score');
         var wscore = $('#game').data('wscore');
+        var srscore = $('#game').data('srscore');
+
+        
         var answerIndex = -1;
         var answerNumber = 0;
         statistic.questions_time['q'+questionIndex]+= (new Date().getTime())-current_time;
 
         var allCorrectRequired = $('div.step-4').hasClass('type-multiple');
-        var correct = allCorrectRequired;
-
+        var correctness = 0;
         $('div.question-choose').find('.variant-wrapper').each(function () {
 
             /* If required all correct answers to be choosed */
+//        	Preciso ajeitar isto para questões que aceita várias respostas
             if (allCorrectRequired && $(this).children().hasClass('choosed') != $(this).data('correct')) {
                 correct = false;
             }
 
             /* If required one correct answers to be choosed */
-            if (!allCorrectRequired && $(this).children().hasClass('choosed') && $(this).data('correct')) {
-                correct = true;
+            if (!allCorrectRequired && $(this).children().hasClass('choosed') && $(this).data('correctness')==2) {
+                correctness = 2;
+
             }
+            if (!allCorrectRequired && $(this).children().hasClass('choosed') && $(this).data('correctness')==1) {
+                correctness = 1;
+            }
+
 
             if($(this).children().hasClass('choosed')) {
                 answerIndex=$(this).index();
@@ -374,34 +390,24 @@ console.log(question.title);
             }
         });
         stopTimer();
+        
+//        var temp;
+//        for (var answer in question.answers) {
+//        	console.log(answer)
+//        	temp += answer.correctness;
+//        }       
+//        console.log(temp);
         answersMaxScore[questionIndex] = parseInt(lscore);
-        if (correct) {
 
-
-            tRewind(sounds.correct);
-            tPlay(sounds.correct, 1);
-
-
-            answers[questionIndex] = parseInt(lscore);
-            score = parseInt($('div.score').html()) + parseInt(lscore);
-            statistic.questions_answers['q' + questionIndex] = 1;
-            statistic.correct_answers++;
-
-            $('div.game .question-answered-block div').html((allCorrectRequired) ? value(question.correct_feedback_text) : value(question.answers[answerNumber].feedback_text));
-            $('#game .step-4').addClass('correct');
-
-            correctQuestionCount++;
-        } else {
-
+        if (correctness==0) {
             tRewind(sounds.incorrect);
             tPlay(sounds.incorrect, 1);
 
-            answers[questionIndex] = 0;
             if ((score = parseInt($('div.score').html()) + parseInt(wscore) >= 0)|| stringToBoolean(nvl(questions.allow_negative_score,"false"))) {
-                answers[questionIndex] = parseInt(wscore);
+            	answers.push(parseInt(wscore));
             } else {
                 score=0;
-                answers[questionIndex] = -parseInt($('div.score').html());
+                answers.push(-parseInt($('div.score').html()));
             }
             statistic.questions_answers['q' + questionIndex] = 0;
             statistic.incorrect_answers++;
@@ -410,25 +416,61 @@ console.log(question.title);
 
             $('#game .step-4').addClass('incorrect');
         }
+        
+        if (correctness==1) {
+            tRewind(sounds.correct);
+            tPlay(sounds.correct, 1);
 
+            answers.push(parseInt(srscore));
+            score = parseInt($('div.score').html()) + parseInt(srscore);
+            statistic.questions_answers['q' + questionIndex] = 1;
+            statistic.correct_answers++;
+
+            $('div.game .question-answered-block div').html((allCorrectRequired) ? value(question.correct_feedback_text) : value(question.answers[answerNumber].feedback_text));
+            $('#game .step-4').addClass('semi-correct');
+
+            correctQuestionCount++;
+        } 
+        
+        if (correctness==2) {
+            tRewind(sounds.correct);
+            tPlay(sounds.correct, 1);
+
+
+            answers.push(parseInt(lscore));
+            score = parseInt($('div.score').html()) + parseInt(lscore);
+            statistic.questions_answers['q' + questionIndex] = 1;
+            statistic.correct_answers++;
+
+            $('div.game .question-answered-block div').html((allCorrectRequired) ? value(question.correct_feedback_text) : value(question.answers[answerNumber].feedback_text));
+            $('#game .step-4').addClass('correct');
+
+            correctQuestionCount++;
+        } 
+        console.log(answers)
+        
         $('#game .step-4').removeClass('unanswered').addClass('answered');
         recalculateScore();
-        instance.onAnswerConfirmed(correct, answerIndex);
+        instance.onAnswerConfirmed(correctness, answerIndex);
+    	answerCount += 1;
+
     };
 
     liveFastClick('a.button-question-continue', function () {
         var ans_div=$('.step-4');
         if (ans_div.hasClass('incorrect')){
-            /* If we need to return to question if answer incorrectly do */
-            /* questionShow(questionIndex); */
+        	questionShow(questionIndex);
 
-            /* Else go to next question */
-            questionIndex++;
-            questionHide(questionIndex);
+        	/* Else go to next question */
+//            questionIndex++;
+//            questionHide(questionIndex);
             recalculateScore();
         } else if (ans_div.hasClass('correct')){
             questionIndex++;
             questionHide(questionIndex);
+            recalculateScore();
+        } else if (ans_div.hasClass('semi-correct')){
+        	questionShow(questionIndex);
             recalculateScore();
         }
     });
@@ -458,7 +500,6 @@ console.log(question.title);
         statistic.questions_time={};
         statistic.questions_answers={};
 
-        answers = {};
         answersMaxScore = {};
         questionIndex = 0;
         timerCount = 0;
@@ -580,7 +621,6 @@ console.log(question.title);
         $("#step1continuebutton").html("" + value(questions.splash_page_button_continue_text));
         $("#step2continuebutton").html("" + value(questions.intro_page_button_continue_text));
         $("#step4continuebutton").html("" + value(questions.question_page_button_continue_text));
-        console.log(questions.question_page_button_confirm_text);
         $("#step4confirmbutton").html("" + value(questions.question_page_button_confirm_text));
         $("#step5replaybutton").html("" + value(questions.result_page_button_replay_text));
         $(".gamebody div.step-5 h2.quiz-results").html("" + value(questions.results)+" <span class='quiz-percent-value'></span>");
