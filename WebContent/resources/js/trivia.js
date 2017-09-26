@@ -2,6 +2,11 @@
  * Copyright eLearning Brothers LLC 2012 All Rights Reserved
  */
 
+h = 'http://'
+host = "localhost:8080/GameServer";
+
+var URL_RESTSERVICE = h + host + '/rest';
+
 var game = new function () {
     var designFile = "design.ini";
     var questionsFile = "questions.ini";
@@ -42,6 +47,15 @@ var game = new function () {
     };
 
     this.readConfig = function () {
+    	$.ajax({
+    		type: 'GET',
+    		url: URL_RESTSERVICE + '/case/'+ 1,
+    		dataType: "json", // data type of response
+    		success: function(data){
+    			questions_temp = data;
+    		},
+			error : function() { }
+    	});
         $.get("resources/config/" + questionsFile, function (iniData) {
             iniData+=prepareIni(iniData,standartQuestionPattern);
             questions = parseIni(iniData);
@@ -176,7 +190,7 @@ var game = new function () {
         $('#game').removeClass('step-2');
         tRewind(sounds.start);
         tRewind(sounds.introduction);
-        questionIndex=1;
+        questionIndex=0;
         correctQuestionCount = 0;
         game.updateProgressText();
         nextQuestion();
@@ -184,7 +198,7 @@ var game = new function () {
     /* -----------------------  STEP-3 Questions ------------------------- */
 
     function nextQuestion() {
-        if (!empty(questions['q' + questionIndex])) {
+        if (!empty(questions_temp.states)) {
             gameTime_question=0;
             startTimer();
             $('#game').removeClass('step-3');
@@ -192,6 +206,15 @@ var game = new function () {
         } else {
             finishGame();
         }
+        
+//        if (!empty(questions['q' + questionIndex])) {
+//            gameTime_question=0;
+//            startTimer();
+//            $('#game').removeClass('step-3');
+//            questionShow(questionIndex);
+//        } else {
+//            finishGame();
+//        }
     }
 
     $(document).bind('endDraw', function () {
@@ -230,32 +253,37 @@ var game = new function () {
     /* -----------------------  STEP-4 Answers ------------------------- */
 
     function questionShow(i) {
-
+    	console.log(i);
+    	console.log(questions_temp.states[i])
         $('#game').addClass('step-4');
-        var question = questions['q' + i];
-        var score = nvl(question.score,1);
+        var question = questions_temp.states[i];
+        var score = nvl(question.right_score,1);
         var wscore = nvl(question.wrong_score,1); /* Question wscore is optional, default 1 per question */
         current_time= (new Date().getTime());
-        if (statistic.questions_answers['q' + i] != 0) statistic.questions_time['q' + i] = 0;//reset question time on start/correct/fail (don't reset on incorrect)
+//        if (statistic.questions_answers['q' + i] != 0) 
+//        	statistic.questions_time['q' + i] = 0;//reset question time on start/correct/fail (don't reset on incorrect)
+        console.log(question.description);
         $('#game').data('question', question).data('score', score).data('wscore', wscore);;
 
         $('.step-4').removeClass("type-multiple");
+console.log(question.title);
         conditionalShow($('.question-block h1'),question.title);
-        $('.question-block div').html(value(question.text));
+        $('.question-block div').html(value(question.description));
         $('.question-choose').html("");
-
         var correct = value(question.correct_answer).split(',');
 
-        var i = 1;
+        console.log(correct);
+        var i = 0;
         var order = [];
 
         // optionally include eli animbutton and clickalert state when specified by ini settings
         var eliAnimButtonDivOpen = (design.eli_anim_button_enabled) ? "<div class='eli-button'>" : "";
         var eliAnimButtonDivClose = (design.eli_anim_button_enabled) ? "</div>" : "";
         var eliAnimClickAlertDiv = (design.eli_anim_clickalert_enabled) ? "<div class='eli-clickalert'></div>" : "";
-
-        while (!empty(value(question['answer_' + i]))) {
-            var variant = $("<div class='variant-wrapper'><div class='variant'>" + eliAnimButtonDivOpen + "<div class='table'><div>" + value(question['answer_' + i]) + "</div></div>" + eliAnimClickAlertDiv + eliAnimButtonDivClose + "</div></div>");
+        console.log(question);
+        while (!empty(value(question.answers[i]))) {
+            var variant = $("<div class='variant-wrapper'><div class='variant'>" + eliAnimButtonDivOpen + "<div class='table'><div>" + value(question.answers[i].text) + "</div></div>" + eliAnimClickAlertDiv + eliAnimButtonDivClose + "</div></div>");
+            
             variant.data({'correct': false, 'number': i});
             for (var k in correct) {
                 if (i == correct[k].trim()) {
@@ -359,7 +387,7 @@ var game = new function () {
             statistic.questions_answers['q' + questionIndex] = 1;
             statistic.correct_answers++;
 
-            $('div.game .question-answered-block div').html((allCorrectRequired) ? value(question.correct_feedback_text) : value(question['answer_' + answerNumber].feedback_text));
+            $('div.game .question-answered-block div').html((allCorrectRequired) ? value(question.correct_feedback_text) : value(question.answers[answerNumber].feedback_text));
             $('#game .step-4').addClass('correct');
 
             correctQuestionCount++;
@@ -378,7 +406,7 @@ var game = new function () {
             statistic.questions_answers['q' + questionIndex] = 0;
             statistic.incorrect_answers++;
             statistic.fail_answers++;
-            $('div.game .question-answered-block div').html((allCorrectRequired) ? value(question.incorrect_feedback_text) : value(question['answer_' + answerNumber].feedback_text));
+            $('div.game .question-answered-block div').html((allCorrectRequired) ? value(question.incorrect_feedback_text) : value(question.answers[answerNumber].feedback_text));
 
             $('#game .step-4').addClass('incorrect');
         }
@@ -552,6 +580,7 @@ var game = new function () {
         $("#step1continuebutton").html("" + value(questions.splash_page_button_continue_text));
         $("#step2continuebutton").html("" + value(questions.intro_page_button_continue_text));
         $("#step4continuebutton").html("" + value(questions.question_page_button_continue_text));
+        console.log(questions.question_page_button_confirm_text);
         $("#step4confirmbutton").html("" + value(questions.question_page_button_confirm_text));
         $("#step5replaybutton").html("" + value(questions.result_page_button_replay_text));
         $(".gamebody div.step-5 h2.quiz-results").html("" + value(questions.results)+" <span class='quiz-percent-value'></span>");
