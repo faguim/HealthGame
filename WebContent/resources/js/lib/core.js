@@ -101,9 +101,6 @@ $.ajaxSetup({
 }());
 
 
-/* A prefix for config files for better differentiation */
-var GAMEPREFIX = "";
-
 var hoverDisable = !!('ontouchstart' in document);// If touch event presents, we run on mobile => no hover
 var suffix = "?cache="+(new Date()).getTime();
 
@@ -389,7 +386,7 @@ var nvl = function (val, defaultVal) {
 };
 
 var stringToBoolean = function (string) {
-    if(typeof(string)==='undefined' || string==null) {
+	if(typeof(string)==='undefined' || string==null) {
         return false;
     }
     switch (string.toLowerCase()) {

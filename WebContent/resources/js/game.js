@@ -12,7 +12,7 @@ var game = new function () {
     var questionsFile = "questions.ini";
     var soundsFile = "sounds.ini";
 
-    var questions;
+    var questions_config;
     var questionCount = 0;
     var design;
     var sounds;
@@ -51,16 +51,19 @@ var game = new function () {
     	$.ajax({
     		type: 'GET',
     		url: URL_RESTSERVICE + '/case/'+ 1,
-    		dataType: "json", // data type of response
+    		dataType: "json",
     		success: function(data){
     			mcase = data;
     		},
-			error : function() { }
+			error : function(e, url) { 
+	            console.error("Falha ao requisitar dados.", e.status);
+			}
     	});
         $.get("resources/config/" + questionsFile, function (iniData) {
             iniData+=prepareIni(iniData,standartQuestionPattern);
-            questions = parseIni(iniData);
-            setOriginalQuestions(questions); defaultQuestionPostProcesor(questions);
+            questions_config = parseIni(iniData);
+            setOriginalQuestions(questions_config); 
+            defaultQuestionPostProcesor(questions_config);
             validity++;
             if (validity == 0) {
                 $(document).trigger('gameLoaded');
@@ -117,7 +120,6 @@ var game = new function () {
     /* -----------------------  FUNCTIONS ------------------------- */
 
     function recalculateScore() {
-    	console.log(mcase.questions[questionIndex]);
         var answeredCount = 0;
         var maxScore = 0;
         var answeredScore = 0;
@@ -136,8 +138,6 @@ var game = new function () {
 
         gameScore = answeredScore;
         instance.onUpdateScore(gameScore);
-        console.log('answeredScore_quiz '+answeredScore_quiz);
-        console.log('maxScore ' + maxScore);
         instance.updateQuizPercent(answeredScore_quiz/maxScore);
         instance.updateProgressText();
     }
@@ -234,7 +234,7 @@ var game = new function () {
         $('#game').removeClass('step-4');
         $('#game').addClass('step-5');
         $('.quiz-results').show();
-        $('div.result-block div.description').html("" + value(questions.conclusion_text));
+        $('div.result-block div.description').html("" + value(mcase.conclusion_won_text));
         flashBackground('start');
 
         if (sounds.conclusion!=null){
@@ -243,17 +243,8 @@ var game = new function () {
         else {tPlay(sounds.finish, PRIORITY_NORMAL);}
 
         recalculateScore();
-        try {
-            SCOSetValue("time", gameTime);
-            SCOSetValue("score", gamePercent);
-            SCOSetValue("completed", 1);
-            SCOCommit();
-        } catch (e) {
-            console.error("Scorm failed -", e);
-        }
-        if('undefined' !==  typeof gameloader ){
-            gameloader.send_results(statistic);
-        }
+        
+//        Retirei do jogo algo relacionado a JCA SCORM. Preciso ver depois o que é
         $(document).trigger('gameFinished',[statistic]);
     }
 
@@ -305,7 +296,7 @@ var game = new function () {
             order[order.length] = variant;
             i++;
         }
-        if (questions.randomize_answer_order) {
+        if (mcase.randomize_answer_order) {
             order.sort(function () {
                 return 0.5 - Math.random()
             });
@@ -396,18 +387,12 @@ var game = new function () {
         });
         stopTimer();
         
-//        var temp;
-//        for (var answer in question.answers) {
-//        	console.log(answer)
-//        	temp += answer.correctness;
-//        }       
-//        console.log(temp);
         answersMaxScore[questionIndex] = parseInt(question.max_score);
         if (correctness==0) {
             tRewind(sounds.incorrect);
             tPlay(sounds.incorrect, 1);
 
-            if ((score = parseInt($('div.score').html()) + parseInt(wscore) >= 0)|| stringToBoolean(nvl(questions.allow_negative_score,"false"))) {
+            if ((score = parseInt($('div.score').html()) + parseInt(wscore) >= 0)|| stringToBoolean(nvl(mcase.allow_negative_score,"false"))) {
             	answers.push(parseInt(wscore));
             } else {
                 score=0;
@@ -451,7 +436,6 @@ var game = new function () {
 
             correctQuestionCount++;
         } 
-        console.log(answers)
         
         $('#game .step-4').removeClass('unanswered').addClass('answered');
         recalculateScore();
@@ -489,7 +473,8 @@ var game = new function () {
     });
 
     this.start = function () {
-		 questions = getOriginalQuestions(); defaultQuestionPostProcesor(questions);
+    	questions_config = getOriginalQuestions(); 
+    	defaultQuestionPostProcesor(questions_config);
         instance.loadData();
         tRewind(sounds.finish);
         tRewind(sounds.conclusion);
@@ -586,14 +571,14 @@ var game = new function () {
         dynamicCssInstance.flush();
     };
     this.loadSounds = function () {
-        if (questions.introduction_audio != null){
+        if (questions_config.introduction_audio != null){
             sounds.introduction = createSound(questions.introduction_audio, true);
         }
-        if (questions.conclusion_audio != null){
+        if (questions_config.conclusion_audio != null){
             sounds.conclusion = createSound(questions.conclusion_audio, true);
         }
-        if (questions.conclusion_lost_audio != null){
-            sounds.conclusion_lost = createSound(questions.conclusion_lost_audio, true);
+        if (questions_config.conclusion_lost_audio != null){
+            sounds.conclusion_lost = createSound(questions_config.conclusion_lost_audio, true);
         }
         if (onlyOneSound) {
             liveFastClick('.game a:not(#step4confirmbutton)', function () {
@@ -617,22 +602,19 @@ var game = new function () {
         }
     };
     this.loadData = function () {
-        questions.randomize_question_order = stringToBoolean(questions.randomize_question_order);
-        questions.randomize_answer_order = stringToBoolean(questions.randomize_answer_order);
-        timeout = nvl(questions.timeout,0) * 1000;
+        timeout = nvl(mcase.timeout,0) * 1000;
 
        /* FILL GAME TEXT */
-        $("#step1continuebutton").html("" + value(questions.splash_page_button_continue_text));
-        $("#step2continuebutton").html("" + value(questions.intro_page_button_continue_text));
-        $("#step4continuebutton").html("" + value(questions.question_page_button_continue_text));
-        $("#step4confirmbutton").html("" + value(questions.question_page_button_confirm_text));
-        $("#step5replaybutton").html("" + value(questions.result_page_button_replay_text));
-        $(".gamebody div.step-5 h2.quiz-results").html("" + value(questions.results)+" <span class='quiz-percent-value'></span>");
-        conditionalShow($('div.step-2-description h1'), questions.introduction_title);
-        $('div.step-2-description div.description div').html("" + value(questions.introduction_text));
-        $('div.step-2-description div.racer-description').html("" + value(questions.introduction_racer_description));
-
-        questionCount = defaultQuestionCount(questions, questions.questions_displayed_from_count);
+        $("#step1continuebutton").html("" + value(questions_config.splash_page_button_continue_text));
+        $("#step2continuebutton").html("" + value(questions_config.intro_page_button_continue_text));
+        $("#step4continuebutton").html("" + value(questions_config.question_page_button_continue_text));
+        $("#step4confirmbutton").html("" + value(questions_config.question_page_button_confirm_text));
+        $("#step5replaybutton").html("" + value(questions_config.result_page_button_replay_text));
+        $(".gamebody div.step-5 h2.quiz-results").html("" + value(questions_config.results)+" <span class='quiz-percent-value'></span>");
+        conditionalShow($('div.step-2-description h1'), questions_config.introduction_title);
+        $('div.step-2-description div.description div').html("" + value(questions_config.introduction_text));
+        $('div.step-2-description div.racer-description').html("" + value(questions_config.introduction_racer_description));
+        questionCount = mcase.questions.length;
     };
 
     this.onGameLoaded = function () {
@@ -664,7 +646,7 @@ var game = new function () {
 //        tPlay(sounds.lost, PRIORITY_NORMAL);
         if (sounds.conclusion_lost != null){tPlay(sounds.conclusion_lost, PRIORITY_NORMAL);}
         $('.quiz-results').hide();
-        $('div.result-block div.description').html("" + value(questions.conclusion_lost_text));
+        $('div.result-block div.description').html("" + value(mcase.conclusion_lost_text));
         /* PUT TIMEOUT CODE HERE IF ANY */
     };
 
@@ -685,19 +667,3 @@ var game = new function () {
         $('div.score').html(score);
     };
 };
-
-$(document).ready(function () {
-    game.readConfig();
-    $('.game').css('opacity', 0.1);
-});
-
-$(window).load(function () {
-
-});
-
-$(document).bind('gameLoaded', function () {
-    SCOPreInitialize();
-    SCOInitialize();
-    $('.game').css('opacity', 1);
-    game.start();
-});
