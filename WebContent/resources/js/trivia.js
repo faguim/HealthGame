@@ -117,6 +117,7 @@ var game = new function () {
     /* -----------------------  FUNCTIONS ------------------------- */
 
     function recalculateScore() {
+    	console.log(mcase.questions[questionIndex]);
         var answeredCount = 0;
         var maxScore = 0;
         var answeredScore = 0;
@@ -127,12 +128,16 @@ var game = new function () {
             if (answers[k]>0){
                 answeredScore_quiz += answers[k];
             }
-            maxScore += answersMaxScore[k];
-
         }
+        
+        for ( var j in mcase.questions) {
+        	maxScore += parseInt(mcase.questions[j].max_score);
+		}
+
         gameScore = answeredScore;
         instance.onUpdateScore(gameScore);
-        console.log(answeredScore_quiz/maxScore);
+        console.log('answeredScore_quiz '+answeredScore_quiz);
+        console.log('maxScore ' + maxScore);
         instance.updateQuizPercent(answeredScore_quiz/maxScore);
         instance.updateProgressText();
     }
@@ -200,7 +205,7 @@ var game = new function () {
     /* -----------------------  STEP-3 Questions ------------------------- */
 
     function nextQuestion() {
-    	if (mcase.states[questionIndex] != undefined ) {
+    	if (mcase.questions[questionIndex] != undefined ) {
             gameTime_question=0;
             startTimer();
             $('#game').removeClass('step-3');
@@ -257,7 +262,7 @@ var game = new function () {
     function questionShow(i) {
         $('#game').addClass('step-4');
 
-        var question = mcase.states[i];
+        var question = mcase.questions[i];
         var score = nvl(question.right_score,1);
         var wscore = nvl(question.wrong_score,1); /* Question wscore is optional, default 1 per question */
         var srscore = nvl(question.semi_right_score,1)
@@ -397,8 +402,7 @@ var game = new function () {
 //        	temp += answer.correctness;
 //        }       
 //        console.log(temp);
-        answersMaxScore[questionIndex] = parseInt(lscore);
-
+        answersMaxScore[questionIndex] = parseInt(question.max_score);
         if (correctness==0) {
             tRewind(sounds.incorrect);
             tPlay(sounds.incorrect, 1);
