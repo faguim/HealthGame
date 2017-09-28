@@ -354,7 +354,6 @@ div.game div#texture {
     width: 720px;
     height: 540px;
     display: block !important;
-    background: red;
 }
 div.game .quiz-results {
     position: absolute;
