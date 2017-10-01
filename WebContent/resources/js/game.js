@@ -3,7 +3,8 @@
  */
 
 h = 'http://'
-host = "localhost:8080/GameServer";
+host = "localhost:8080/gameserver";
+//host = "ebm.lis.ic.unicamp.br/game/GameServer";
 
 var URL_RESTSERVICE = h + host + '/rest';
 
@@ -53,9 +54,12 @@ var game = new function () {
     		url: URL_RESTSERVICE + '/case/'+ 1,
     		dataType: "json",
     		success: function(data){
+    			console.log('d');
     			mcase = data;
     		},
 			error : function(e, url) { 
+    			console.log('e');
+
 	            console.error("Falha ao requisitar dados.", e.status);
 			}
     	});
