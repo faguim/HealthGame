@@ -51,15 +51,13 @@ var game = new function () {
     this.readConfig = function () {
     	$.ajax({
     		type: 'GET',
-    		url: URL_RESTSERVICE + '/case/'+ 1,
+    		url: URL_RESTSERVICE + '/case',
     		dataType: "json",
+    		async: false,
     		success: function(data){
-    			console.log('d');
     			mcase = data;
     		},
 			error : function(e, url) { 
-    			console.log('e');
-
 	            console.error("Falha ao requisitar dados.", e.status);
 			}
     	});
