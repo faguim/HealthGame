@@ -3,8 +3,8 @@
  */
 
 h = 'http://'
-host = "localhost:8080/gameserver";
-//host = "ebm.lis.ic.unicamp.br/game/GameServer";
+//host = "localhost:8080/gameserver";
+host = "ebm.lis.ic.unicamp.br/game/gameserver";
 
 var URL_RESTSERVICE = h + host + '/rest';
 
@@ -51,7 +51,7 @@ var game = new function () {
     this.readConfig = function () {
     	$.ajax({
     		type: 'GET',
-    		url: URL_RESTSERVICE + '/case',
+    		url: URL_RESTSERVICE + '/case/'+1,
     		dataType: "json",
     		async: false,
     		success: function(data){
